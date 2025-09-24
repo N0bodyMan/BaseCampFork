@@ -1,23 +1,40 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.8;
 
-// Import the AddressBook contract to interact with it
 import "./AddressBook.sol";
 
-// Contract for creating new instances of AddressBook
 contract AddressBookFactory {
-    // Define a private salt value for internal use
-    string private salt = "value";
+    // Список всех развернутых AddressBook
+    AddressBook[] private addressBooks;
 
-    // Function to deploy a new instance of AddressBook
+    // Событие при успешном деплое
+    event AddressBookDeployed(address indexed owner, address addressBook);
+
+    // Функция деплоя нового AddressBook
     function deploy() external returns (AddressBook) {
-        // Create a new instance of AddressBook
+        // Создаем новый контракт
         AddressBook newAddressBook = new AddressBook();
 
-        // Transfer ownership of the new AddressBook contract to the caller of this function
+        // Передаем владение пользователю, вызвавшему deploy()
         newAddressBook.transferOwnership(msg.sender);
 
-        // Return the newly created AddressBook contract
+        // Сохраняем контракт в массив
+        addressBooks.push(newAddressBook);
+
+        // Логируем событие
+        emit AddressBookDeployed(msg.sender, address(newAddressBook));
+
         return newAddressBook;
     }
+
+    // Получить все развернутые AddressBook
+    function getAllAddressBooks() external view returns (AddressBook[] memory) {
+        return addressBooks;
+    }
+
+    // Получить количество развернутых AddressBook
+    function count() external view returns (uint256) {
+        return addressBooks.length;
+    }
 }
+
