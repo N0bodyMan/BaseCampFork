@@ -1,51 +1,60 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// Contract for an unburnable token
+/// @title UnburnableToken
+/// @notice Простейший токен, который нельзя сжечь, но можно получить 1 раз и передавать другим
 contract UnburnableToken {
-    string private salt = "value"; // A private string variable
+    // Метаданные токена
+    string public constant name = "UnburnableToken";
+    string public constant symbol = "UNT";
+    uint8 public constant decimals = 18;
 
-    // Mapping to track token balances of addresses
+    uint256 public immutable totalSupply; // Общий запас
+    uint256 public totalClaimed;          // Сколько всего выдано
+
+    // Балансы пользователей
     mapping(address => uint256) public balances;
+    // Кто уже получил токены
+    mapping(address => bool) private claimed;
 
-    uint256 public totalSupply; // Total supply of tokens
-    uint256 public totalClaimed; // Total number of tokens claimed
-    mapping(address => bool) private claimed; // Mapping to track whether an address has claimed tokens
+    // События
+    event Claimed(address indexed account, uint256 amount);
+    event Transfer(address indexed from, address indexed to, uint256 amount);
 
-    // Custom errors
-    error TokensClaimed(); // Error for attempting to claim tokens again
-    error AllTokensClaimed(); // Error for attempting to claim tokens when all are already claimed
-    error UnsafeTransfer(address _to); // Error for unsafe token transfer
+    // Ошибки
+    error TokensAlreadyClaimed();
+    error AllTokensClaimed();
+    error InvalidRecipient(address to);
+    error InsufficientBalance(uint256 balance, uint256 required);
 
-    // Constructor to set the total supply of tokens
-    constructor() {
-        totalSupply = 100000000; // Set the total supply of tokens
+    /// @notice Конструктор задает общий supply
+    constructor(uint256 _totalSupply) {
+        require(_totalSupply > 0, "Total supply must be > 0");
+        totalSupply = _totalSupply;
     }
 
-    // Public function to claim tokens
-    function claim() public {
-        // Check if all tokens have been claimed
-        if (totalClaimed >= totalSupply) revert AllTokensClaimed();
-        
-        // Check if the caller has already claimed tokens
-        if (claimed[msg.sender]) revert TokensClaimed();
+    /// @notice Заявка на бесплатные токены (каждый адрес может получить только 1 раз)
+    function claim(uint256 amount) external {
+        if (totalClaimed + amount > totalSupply) revert AllTokensClaimed();
+        if (claimed[msg.sender]) revert TokensAlreadyClaimed();
 
-        // Update balances and claimed status
-        balances[msg.sender] += 1000;
-        totalClaimed += 1000;
         claimed[msg.sender] = true;
+        balances[msg.sender] += amount;
+        totalClaimed += amount;
+
+        emit Claimed(msg.sender, amount);
     }
 
-    // Public function for safe token transfer
-    function safeTransfer(address _to, uint256 _amount) public {
-        // Check for unsafe transfer conditions, including if the target address has a non-zero ether balance
-        if (_to == address(0) || _to.balance == 0) revert UnsafeTransfer(_to);
+    /// @notice Безопасный перевод токенов
+    function transfer(address to, uint256 amount) external {
+        if (to == address(0)) revert InvalidRecipient(to);
 
-        // Ensure the sender has enough balance to transfer
-        require(balances[msg.sender] >= _amount, "Insufficient balance");
+        uint256 balance = balances[msg.sender];
+        if (balance < amount) revert InsufficientBalance(balance, amount);
 
-        // Perform the transfer
-        balances[msg.sender] -= _amount;
-        balances[_to] += _amount;
+        balances[msg.sender] = balance - amount;
+        balances[to] += amount;
+
+        emit Transfer(msg.sender, to, amount);
     }
 }
